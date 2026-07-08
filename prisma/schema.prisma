@@ -1,0 +1,244 @@
+// Schema Prisma - Carriere+
+// Base de donnees relationnelle : PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  CANDIDATE
+  RECRUITER
+  ADMIN
+}
+
+enum OfferType {
+  EMPLOI
+  STAGE
+  CONCOURS
+}
+
+enum ContractType {
+  CDI
+  CDD
+  STAGE
+  FREELANCE
+  CONCOURS
+}
+
+enum ApplicationStatus {
+  ENVOYEE
+  VUE
+  PRESELECTIONNEE
+  ENTRETIEN
+  ACCEPTEE
+  REJETEE
+}
+
+enum ResourceCategory {
+  ANCIEN_SUJET_CONCOURS
+  ANCIEN_SUJET_RECRUTEMENT
+  DOCUMENT_PREPARATION
+  CONSEIL_ENTRETIEN
+  CONSEIL_CV
+}
+
+enum TestCategory {
+  CULTURE_GENERALE
+  LOGIQUE
+  INFORMATIQUE
+  FRANCAIS
+  ANGLAIS
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  role          Role
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  candidateProfile CandidateProfile?
+  recruiterProfile RecruiterProfile?
+  refreshTokens    RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+model CandidateProfile {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName     String
+  lastName      String
+  phone         String?
+  city          String?
+  headline      String?  // ex: "Etudiant en informatique"
+  bio           String?
+  skills        String[] @default([])
+  cvUrl         String?  // fichier CV stocke sur le cloud
+  cvParsedData  Json?    // resultat de l'analyse IA du CV
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  applications      Application[]
+  savedOffers       SavedOffer[]
+  alerts            Alert[]
+  testResults       TestResult[]
+  interviewSessions InterviewSession[]
+
+  @@map("candidate_profiles")
+}
+
+model RecruiterProfile {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName  String
+  organizationType String? // Entreprise privee, ONG, Administration publique, Cabinet de recrutement...
+  logoUrl      String?
+  description  String?
+  website      String?
+  city         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  offers Offer[]
+
+  @@map("recruiter_profiles")
+}
+
+model Offer {
+  id             String       @id @default(uuid())
+  recruiterId    String
+  recruiter      RecruiterProfile @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+  title          String
+  type           OfferType
+  contractType   ContractType?
+  description    String
+  requirements   String?
+  location       String?
+  remote         Boolean      @default(false)
+  salaryMin      Int?
+  salaryMax      Int?
+  deadline       DateTime?
+  isPremium      Boolean      @default(false)
+  isPublished    Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  applications Application[]
+  savedBy      SavedOffer[]
+
+  @@index([type])
+  @@index([isPublished])
+  @@map("offers")
+}
+
+model Application {
+  id           String            @id @default(uuid())
+  candidateId  String
+  candidate    CandidateProfile  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  offerId      String
+  offer        Offer             @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  coverLetter  String?
+  cvUrlSnapshot String?
+  status       ApplicationStatus @default(ENVOYEE)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([candidateId, offerId])
+  @@map("applications")
+}
+
+model SavedOffer {
+  id          String           @id @default(uuid())
+  candidateId String
+  candidate   CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  offerId     String
+  offer       Offer            @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
+
+  @@unique([candidateId, offerId])
+  @@map("saved_offers")
+}
+
+model Alert {
+  id          String           @id @default(uuid())
+  candidateId String
+  candidate   CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  keyword     String?
+  offerType   OfferType?
+  location    String?
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+
+  @@map("alerts")
+}
+
+model LibraryResource {
+  id          String           @id @default(uuid())
+  title       String
+  category    ResourceCategory
+  description String?
+  fileUrl     String
+  correctionUrl String?
+  createdAt   DateTime         @default(now())
+
+  @@map("library_resources")
+}
+
+model TestQuestion {
+  id            String       @id @default(uuid())
+  category      TestCategory
+  question      String
+  choices       String[]
+  correctIndex  Int
+  createdAt     DateTime     @default(now())
+
+  @@map("test_questions")
+}
+
+model TestResult {
+  id           String           @id @default(uuid())
+  candidateId  String
+  candidate    CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  category     TestCategory
+  score        Int
+  totalQuestions Int
+  durationSec  Int
+  createdAt    DateTime         @default(now())
+
+  @@map("test_results")
+}
+
+model InterviewSession {
+  id           String           @id @default(uuid())
+  candidateId  String
+  candidate    CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  jobTitle     String?
+  questions    Json             // questions generees par l'IA
+  answers      Json?            // reponses du candidat
+  evaluation   Json?            // evaluation IA des reponses
+  createdAt    DateTime         @default(now())
+
+  @@map("interview_sessions")
+}
