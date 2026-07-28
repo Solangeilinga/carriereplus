@@ -19,6 +19,7 @@ const aiRoutes = require('./modules/ai/ai.routes');
 const uploadRoutes = require('./modules/upload/upload.routes');
 const alertsRoutes = require('./modules/alerts/alerts.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
+const notificationsRoutes = require('./modules/notifications/notifications.routes');
 
 const app = express();
 
@@ -42,6 +43,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/alerts', alertsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 app.use((req, res) => res.status(404).json({ success: false, message: 'Route introuvable' }));
 app.use(errorHandler);

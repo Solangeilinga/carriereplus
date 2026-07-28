@@ -9,4 +9,13 @@ const createResourceRules = [
   body('correctionUrl').optional().isURL(),
 ];
 
-module.exports = { createResourceRules };
+const updateResourceRules = [
+  body('title').optional().notEmpty(),
+  body('category')
+    .optional()
+    .isIn(['ANCIEN_SUJET_CONCOURS', 'ANCIEN_SUJET_RECRUTEMENT', 'DOCUMENT_PREPARATION', 'CONSEIL_ENTRETIEN', 'CONSEIL_CV']),
+  body('fileUrl').optional().isURL(),
+  body('correctionUrl').optional().isURL(),
+];
+
+module.exports = { createResourceRules, updateResourceRules };

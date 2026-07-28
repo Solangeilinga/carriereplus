@@ -14,4 +14,17 @@ const loginRules = [
   body('password').notEmpty().withMessage('Mot de passe requis'),
 ];
 
-module.exports = { registerRules, loginRules };
+const forgotPasswordRules = [
+  body('email').isEmail().withMessage('Email invalide'),
+];
+
+const resetPasswordRules = [
+  body('token').notEmpty().withMessage('Code de réinitialisation requis'),
+  body('newPassword').isLength({ min: 6 }).withMessage('Le mot de passe doit contenir au moins 6 caracteres'),
+];
+
+const resendVerificationRules = [
+  body('email').isEmail().withMessage('Email invalide'),
+];
+
+module.exports = { registerRules, loginRules, forgotPasswordRules, resetPasswordRules, resendVerificationRules };

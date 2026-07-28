@@ -1,11 +1,29 @@
 const prisma = require('../../config/db');
 const ApiError = require('../../utils/ApiError');
 const { callAI, parseAiJson } = require('./ai.client');
+const { extractTextFromPdfUrl } = require('../../utils/pdfText');
 
-// Analyse le CV d'un candidat (texte extrait du CV) et retourne des suggestions
-async function analyzeCv(candidateUserId, cvText) {
+// Analyse le CV d'un candidat. Si aucun texte n'est fourni explicitement, le texte est
+// extrait automatiquement depuis le CV PDF deja importe par le candidat (cvUrl).
+async function analyzeCv(candidateUserId, providedCvText) {
   const candidate = await prisma.candidateProfile.findUnique({ where: { userId: candidateUserId } });
   if (!candidate) throw new ApiError(404, 'Profil candidat introuvable');
+
+  let cvText = providedCvText?.trim();
+
+  if (!cvText) {
+    if (!candidate.cvUrl) {
+      throw new ApiError(400, "Aucun CV importe. Importe d'abord ton CV dans ton profil, ou colle le texte manuellement.");
+    }
+    try {
+      cvText = await extractTextFromPdfUrl(candidate.cvUrl);
+    } catch (err) {
+      throw new ApiError(422, "Impossible d'extraire le texte du CV importé (le fichier est peut-être une image scannée sans texte). Essaie de coller le texte manuellement.");
+    }
+    if (!cvText || cvText.trim().length < 30) {
+      throw new ApiError(422, 'Le CV importé ne contient pas assez de texte lisible (probablement une image scannée). Colle le texte manuellement.');
+    }
+  }
 
   const prompt = `Tu es un expert en recrutement. Analyse ce CV et reponds UNIQUEMENT en JSON avec le format:
 {"points_forts": [...], "points_a_ameliorer": [...], "competences_detectees": [...], "score_global": 0-100}

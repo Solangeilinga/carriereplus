@@ -1,5 +1,7 @@
 const prisma = require('../../config/db');
 const ApiError = require('../../utils/ApiError');
+const { sendAlertMatchEmail } = require('../../services/email.service');
+const { notifyUser } = require('../notifications/notifications.service');
 
 async function createAlert(candidateUserId, { keyword, offerType, location }) {
   const candidate = await prisma.candidateProfile.findUnique({ where: { userId: candidateUserId } });
@@ -45,15 +47,42 @@ async function matchOffersForAlert(alert) {
   });
 }
 
-// A brancher sur un cron (ex: node-cron) pour l'envoi d'emails/notifications push quotidien
+// Calcule les correspondances quotidiennes et notifie chaque candidat concerne (email + push).
+// A brancher sur un scheduler (voir src/cron/dailyAlerts.cron.js).
 async function runDailyAlertMatching() {
-  const alerts = await prisma.alert.findMany({ where: { isActive: true } });
+  const alerts = await prisma.alert.findMany({
+    where: { isActive: true },
+    include: { candidate: { include: { user: { select: { id: true, email: true } } } } },
+  });
+
   const results = [];
   for (const alert of alerts) {
     const offers = await matchOffersForAlert(alert);
-    if (offers.length > 0) results.push({ alertId: alert.id, candidateId: alert.candidateId, offers });
+    if (offers.length === 0) continue;
+
+    results.push({ alertId: alert.id, candidateId: alert.candidateId, offers });
+
+    try {
+      await sendAlertMatchEmail({
+        to: alert.candidate.user.email,
+        candidateName: alert.candidate.firstName,
+        offers,
+      });
+    } catch (err) {
+      console.error(`Echec envoi email alerte ${alert.id}:`, err.message);
+    }
+
+    try {
+      await notifyUser(alert.candidate.user.id, {
+        title: 'Nouvelles offres pour vous',
+        body: `${offers.length} nouvelle(s) offre(s) correspondent à votre alerte.`,
+        data: { type: 'alert_match', alertId: alert.id },
+      });
+    } catch (err) {
+      console.error(`Echec notification push alerte ${alert.id}:`, err.message);
+    }
   }
-  return results; // ici : brancher un service d'envoi (email, push notification, etc.)
+  return results;
 }
 
 module.exports = { createAlert, listAlerts, deleteAlert, matchOffersForAlert, runDailyAlertMatching };

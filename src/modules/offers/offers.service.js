@@ -65,7 +65,7 @@ async function listMyOffers(userId) {
 async function getOffer(id) {
   const offer = await prisma.offer.findUnique({
     where: { id },
-    include: { recruiter: true },
+    include: { recruiter: { include: { user: { select: { email: true } } } } },
   });
   if (!offer) throw new ApiError(404, 'Offre introuvable');
   return offer;

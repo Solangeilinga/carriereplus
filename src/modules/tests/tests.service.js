@@ -43,4 +43,44 @@ async function myResults(candidateUserId) {
   });
 }
 
-module.exports = { getQuestions, submitResult, myResults };
+// --- Gestion admin des questions (CRUD complet, avec correctIndex visible) ---
+
+async function listAllQuestions({ category, page = 1, pageSize = 20 }) {
+  const where = category ? { category } : {};
+  const [items, total] = await Promise.all([
+    prisma.testQuestion.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.testQuestion.count({ where }),
+  ]);
+  return { items, total, page: Number(page), pageSize: Number(pageSize) };
+}
+
+async function createQuestion(data) {
+  return prisma.testQuestion.create({ data });
+}
+
+async function updateQuestion(id, data) {
+  const question = await prisma.testQuestion.findUnique({ where: { id } });
+  if (!question) throw new ApiError(404, 'Question introuvable');
+  return prisma.testQuestion.update({ where: { id }, data });
+}
+
+async function deleteQuestion(id) {
+  const question = await prisma.testQuestion.findUnique({ where: { id } });
+  if (!question) throw new ApiError(404, 'Question introuvable');
+  await prisma.testQuestion.delete({ where: { id } });
+}
+
+module.exports = {
+  getQuestions,
+  submitResult,
+  myResults,
+  listAllQuestions,
+  createQuestion,
+  updateQuestion,
+  deleteQuestion,
+};
