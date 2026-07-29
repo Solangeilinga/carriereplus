@@ -17,12 +17,22 @@ async function submitResult(candidateUserId, { category, answers, durationSec })
   const questions = await prisma.testQuestion.findMany({ where: { id: { in: questionIds } } });
 
   let score = 0;
+  const corrections = [];
   for (const answer of answers) {
     const question = questions.find((q) => q.id === answer.questionId);
-    if (question && question.correctIndex === answer.choiceIndex) score += 1;
+    if (!question) continue;
+    const isCorrect = question.correctIndex === answer.choiceIndex;
+    if (isCorrect) score += 1;
+    corrections.push({
+      question: question.question,
+      choices: question.choices,
+      yourChoiceIndex: answer.choiceIndex,
+      correctIndex: question.correctIndex,
+      isCorrect,
+    });
   }
 
-  return prisma.testResult.create({
+  const result = await prisma.testResult.create({
     data: {
       candidateId: candidate.id,
       category,
@@ -31,6 +41,9 @@ async function submitResult(candidateUserId, { category, answers, durationSec })
       durationSec,
     },
   });
+
+  // Le detail des corrections n'est pas persiste en base (juste renvoye pour affichage immediat)
+  return { ...result, corrections };
 }
 
 async function myResults(candidateUserId) {
