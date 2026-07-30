@@ -23,6 +23,13 @@ const notificationsRoutes = require('./modules/notifications/notifications.route
 
 const app = express();
 
+// Render (et la plupart des hebergeurs) placent l'app derriere un reverse proxy : sans
+// ce reglage, Express rejette l'en-tete X-Forwarded-For et express-rate-limit plante
+// silencieusement sur chaque requete (symptome observe : les requetes restent sans
+// reponse, aucun code de statut renvoye). "1" = fait confiance au premier proxy en amont,
+// ce qui correspond exactement a l'infrastructure de Render.
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
