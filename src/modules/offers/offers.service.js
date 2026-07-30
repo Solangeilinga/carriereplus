@@ -1,9 +1,26 @@
 const prisma = require('../../config/db');
 const ApiError = require('../../utils/ApiError');
 
-async function createOffer(userId, data) {
-  const recruiter = await prisma.recruiterProfile.findUnique({ where: { userId } });
+// Recupere le profil "recruteur" lie a un utilisateur. Si l'utilisateur est un ADMIN
+// et n'a pas encore de profil recruteur, on lui en cree un automatiquement (transparent
+// pour l'admin : il n'a jamais a remplir de formulaire d'entreprise pour publier une offre).
+async function ensureRecruiterProfile(userId, role) {
+  let recruiter = await prisma.recruiterProfile.findUnique({ where: { userId } });
+  if (!recruiter && role === 'ADMIN') {
+    recruiter = await prisma.recruiterProfile.create({
+      data: {
+        userId,
+        companyName: 'Carrière+ (Administration)',
+        organizationType: 'Plateforme Carrière+',
+      },
+    });
+  }
   if (!recruiter) throw new ApiError(404, 'Profil recruteur introuvable');
+  return recruiter;
+}
+
+async function createOffer(userId, role, data) {
+  const recruiter = await ensureRecruiterProfile(userId, role);
 
   return prisma.offer.create({
     data: {
@@ -56,10 +73,9 @@ async function listOffers({ type, q, location, page = 1, pageSize = 20 }) {
   return { items, total, page: pageNum, pageSize: pageSizeNum };
 }
 
-// Liste les offres publiees ET non publiees d'un recruteur (tableau de bord recruteur)
-async function listMyOffers(userId) {
-  const recruiter = await prisma.recruiterProfile.findUnique({ where: { userId } });
-  if (!recruiter) throw new ApiError(404, 'Profil recruteur introuvable');
+// Liste les offres publiees ET non publiees d'un recruteur ou d'un admin (tableau de bord)
+async function listMyOffers(userId, role) {
+  const recruiter = await ensureRecruiterProfile(userId, role);
 
   return prisma.offer.findMany({
     where: { recruiterId: recruiter.id },
@@ -113,4 +129,40 @@ async function unsaveOffer(candidateUserId, offerId) {
   }).catch(() => {}); // idempotent
 }
 
-module.exports = { createOffer, listOffers, listMyOffers, getOffer, updateOffer, deleteOffer, saveOffer, unsaveOffer };
+// Liste des offres sauvegardees (favoris) par un candidat
+async function listSavedOffers(candidateUserId) {
+  const candidate = await prisma.candidateProfile.findUnique({ where: { userId: candidateUserId } });
+  if (!candidate) throw new ApiError(404, 'Profil candidat introuvable');
+
+  const saved = await prisma.savedOffer.findMany({
+    where: { candidateId: candidate.id },
+    include: { offer: { include: { recruiter: { select: { companyName: true } } } } },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return saved.map((s) => s.offer);
+}
+
+// Indique si une offre donnee est deja dans les favoris du candidat (pour l'icone du detail d'offre)
+async function isOfferSaved(candidateUserId, offerId) {
+  const candidate = await prisma.candidateProfile.findUnique({ where: { userId: candidateUserId } });
+  if (!candidate) return false;
+
+  const saved = await prisma.savedOffer.findUnique({
+    where: { candidateId_offerId: { candidateId: candidate.id, offerId } },
+  });
+  return !!saved;
+}
+
+module.exports = {
+  createOffer,
+  listOffers,
+  listMyOffers,
+  getOffer,
+  updateOffer,
+  deleteOffer,
+  saveOffer,
+  unsaveOffer,
+  listSavedOffers,
+  isOfferSaved,
+};

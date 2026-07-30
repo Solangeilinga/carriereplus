@@ -7,7 +7,9 @@ router.use(authenticate, authorize('CANDIDATE'));
 
 router.post('/cv/analyze', controller.analyzeCv);
 router.get('/offers/recommended', controller.recommendOffers);
-router.post('/interview/generate', controller.generateInterview);
-router.post('/interview/:sessionId/evaluate', controller.evaluateInterview);
+
+// Simulation d'entretien conversationnelle : une question a la fois
+router.post('/interview/start', controller.startInterview);
+router.post('/interview/:sessionId/answer', controller.answerInterview);
 
 module.exports = router;

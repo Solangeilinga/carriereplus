@@ -10,14 +10,14 @@ async function recommendOffers(req, res) {
   res.json({ success: true, data: offers });
 }
 
-async function generateInterview(req, res) {
-  const session = await aiService.generateInterview(req.user.id, req.body.jobTitle);
-  res.status(201).json({ success: true, data: session });
+async function startInterview(req, res) {
+  const result = await aiService.startInterview(req.user.id, req.body.jobTitle);
+  res.status(201).json({ success: true, data: result });
 }
 
-async function evaluateInterview(req, res) {
-  const session = await aiService.evaluateInterview(req.user.id, req.params.sessionId, req.body.answers);
-  res.json({ success: true, data: session });
+async function answerInterview(req, res) {
+  const result = await aiService.answerInterview(req.user.id, req.params.sessionId, req.body.answer);
+  res.json({ success: true, data: result });
 }
 
-module.exports = { analyzeCv, recommendOffers, generateInterview, evaluateInterview };
+module.exports = { analyzeCv, recommendOffers, startInterview, answerInterview };
