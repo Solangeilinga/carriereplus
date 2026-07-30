@@ -24,6 +24,12 @@ async function createOffer(userId, data) {
 
 // Recherche d'offres avec filtres (type, mot-cle, localisation)
 async function listOffers({ type, q, location, page = 1, pageSize = 20 }) {
+  // req.query renvoie toujours des chaines de caracteres (ex: "10"), meme pour des nombres.
+  // Prisma exige des Int stricts pour skip/take : sans cette conversion, la requete
+  // echoue des qu'un parametre de pagination est explicitement fourni dans l'URL.
+  const pageNum = Number(page) || 1;
+  const pageSizeNum = Number(pageSize) || 20;
+
   const where = {
     isPublished: true,
     ...(type && { type }),
@@ -41,13 +47,13 @@ async function listOffers({ type, q, location, page = 1, pageSize = 20 }) {
       where,
       include: { recruiter: { select: { companyName: true, logoUrl: true } } },
       orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
+      skip: (pageNum - 1) * pageSizeNum,
+      take: pageSizeNum,
     }),
     prisma.offer.count({ where }),
   ]);
 
-  return { items, total, page: Number(page), pageSize: Number(pageSize) };
+  return { items, total, page: pageNum, pageSize: pageSizeNum };
 }
 
 // Liste les offres publiees ET non publiees d'un recruteur (tableau de bord recruteur)
